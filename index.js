@@ -60,11 +60,13 @@ router.get('/', function (req, res) {
 
 router.post('/', function (req, res) {
   post_boat(req.body.name, req.body.type, req.body.length).then((key) => {
+    const self = 'http://' + req.headers['host'] + '/boats/' + key.id;
     res.status(201).json({
       name: req.body.name,
       type: req.body.type,
       length: req.body.length,
       id: key.id,
+      self: self,
     });
   });
 });
