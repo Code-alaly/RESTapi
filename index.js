@@ -59,8 +59,13 @@ router.get('/', function (req, res) {
 });
 
 router.post('/', function (req, res) {
-  post_boat(req.body.name, req.body.description, req.body.price).then((key) => {
-    res.status(200).send('{ "id": ' + key.id + ' }');
+  post_boat(req.body.name, req.body.type, req.body.length).then((key) => {
+    res.status(201).json({
+      name: req.body.name,
+      type: req.body.type,
+      length: req.body.length,
+      id: key.id,
+    });
   });
 });
 
