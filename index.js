@@ -1,61 +1,144 @@
 const express = require('express');
-const {readFileSync} = require('fs');
-const metadata = require('gcp-metadata');
-const handlebars = require('handlebars');
-const pkg = require('./package');
-
 const app = express();
-// Serve the files in /assets at the URI /assets.
-app.use('/assets', express.static('assets'));
 
-// The HTML content is produced by rendering a handlebars template.
-// The template values are stored in global state for reuse.
-const data = {
-  project: process.env.GOOGLE_CLOUD_PROJECT,
-  service: process.env.K_SERVICE || '???',
-  revision: process.env.K_REVISION || '???',
-};
-let template;
+const {Datastore} = require('@google-cloud/datastore');
+const bodyParser = require('body-parser');
 
-app.get('/', async (req, res) => {
-  // The handlebars template is stored in global state so this will only once.
-  if (!template) {
-    // Load Handlebars template from filesystem and compile for use.
-    try {
-      template = handlebars.compile(readFileSync('index.html.hbs', 'utf8'));
-    } catch (e) {
-      console.error(e);
-      res.status(500).send('Internal Server Error');
-    }
+const datastore = new Datastore({projectId: 'cloud-jetbrains-project'});
 
-    // Populate the Google Cloud Project template parameter.
-    // If the custom environment variable GOOGLE_CLOUD_PROJECT is not set
-    // check the Cloud Run metadata server for the project ID.
-    if (!data.project) {
-      try {
-        data.project = await metadata.project('project-id');
-      } catch (e) {
-        data.project = undefined;
-        console.error(e);
-      }
-    }
-  }
+const boat = 'boats';
 
-  // Apply the template to the parameters to generate an HTML string.
-  try {
-    const output = template(data);
-    res.status(200).send(output);
-  } catch (e) {
-    console.error(e);
-    res.status(500).send('Internal Server Error');
-  }
+const s = 'slips';
+
+const router = express.Router();
+
+app.use(bodyParser.json());
+
+function fromDatastore(item) {
+  item.id = item[Datastore.KEY].id;
+  return item;
+}
+
+// now creating the boats and slips assignment.
+
+/* ------------- Begin boat Model Functions ------------- */
+function post_boat(name, type, length) {
+  const key = datastore.key(boat);
+  const new_boat = {name: name, type: type, length: length};
+  return datastore.save({key: key, data: new_boat}).then(() => {
+    return key;
+  });
+}
+
+function get_boats() {
+  const q = datastore.createQuery(boat);
+  return datastore.runQuery(q).then((entities) => {
+    return entities[0].map(fromDatastore);
+  });
+}
+
+function put_boat(id, name, description, price) {
+  const key = datastore.key([boat, parseInt(id, 10)]);
+  const boat = {name: name, type: description, length: price};
+  return datastore.save({key: key, data: boat});
+}
+
+function delete_boat(id) {
+  const key = datastore.key([boat, parseInt(id, 10)]);
+  return datastore.delete(key);
+}
+
+/* ------------- End Model Functions ------------- */
+
+/* ------------- Begin Controller Functions ------------- */
+
+router.get('/', function (req, res) {
+  const boats = get_boats().then((boats) => {
+    res.status(200).json(boats);
+  });
 });
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(
-    'Hello from Cloud Run! The container started successfully and is listening for HTTP requests on $PORT'
+router.post('/', function (req, res) {
+  post_boat(req.body.name, req.body.description, req.body.price).then((key) => {
+    res.status(200).send('{ "id": ' + key.id + ' }');
+  });
+});
+
+router.put('/:id', function (req, res) {
+  put_boat(req.params.id, req.body.name, req.body.type, req.body.length).then(
+    res.status(200).end()
   );
-  console.log(`${pkg.name} listening on port ${PORT}`);
-  console.log('Press Ctrl+C to quit.');
+});
+
+router.delete('/:id', function (req, res) {
+  delete_boat(req.params.id).then(res.status(200).end());
+});
+
+app.use('/boats', router);
+/* ------------- End Controller Functions ------------- */
+
+// begin slip model functions
+
+function post_slips(number) {
+  const key = datastore.key(s);
+  const new_slip = {number: number};
+  return datastore.save({key: key, data: new_slip}).then(() => {
+    return key;
+  });
+}
+
+function get_slips() {
+  const q = datastore.createQuery(s);
+  return datastore.runQuery(q).then((entities) => {
+    return entities[0].map(fromDatastore);
+  });
+}
+
+function put_slips(id, boat) {
+  const key = datastore.key([s, parseInt(id, 10)]);
+  const slip = {boat: boat};
+  return datastore.save({key: key, data: slip});
+}
+
+function delete_slips(id) {
+  const key = datastore.key([s, parseInt(id, 10)]);
+  return datastore.delete(key);
+}
+
+app.use('/slips', function (req, res) {
+  const slips = get_slips().then((slips) => {
+    res.status(200).json(slips);
+  });
+});
+
+app.post('/slips', function (req, res) {
+  post_slips(req.body.number).then((key) => {
+    res
+      .status(200)
+      .send(
+        '{ "id": ' +
+          key.id +
+          ' }, ' +
+          '{ "number": ' +
+          req.body.number +
+          ' },' +
+          '{ "current_boat": ' +
+          'null' +
+          ' }'
+      );
+  });
+});
+
+app.put('slips/:s_id/:b_id', function (req, res) {
+  put_slips(req.params.id, req.params, req.body.boat).then(
+    res.status(200).end()
+  );
+});
+
+// app.use('/slips', router);
+
+// Listen to the App Engine-specified port, or 8080 otherwise
+const PORT = process.env.PORT || 8081;
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}...`);
 });
