@@ -59,6 +59,16 @@ router.get('/', function (req, res) {
 });
 
 router.post('/', function (req, res) {
+  const bd = req.body.name;
+  const ty = req.body.type;
+  const le = req.body.length;
+  if (bd === undefined || ty === undefined || le === undefined) {
+    res.status(400).json({
+      Error:
+        'The request object is missing at least one of the required attributes',
+    });
+    return;
+  }
   post_boat(req.body.name, req.body.type, req.body.length).then((key) => {
     const self = 'http://' + req.headers['host'] + '/boats/' + key.id;
     res.status(201).json({
