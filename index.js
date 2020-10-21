@@ -14,6 +14,20 @@ const router = express.Router();
 
 app.use(bodyParser.json());
 
+function allAttr(req, res) {
+  const bd = req.body.name;
+  const ty = req.body.type;
+  const le = req.body.length;
+  if (bd === undefined || ty === undefined || le === undefined) {
+    res.status(400).json({
+      Error:
+        'The request object is missing at least one of the required attributes',
+    });
+    return true;
+  }
+  return false;
+}
+
 function fromDatastore(item) {
   item.id = item[Datastore.KEY].id;
   return item;
@@ -29,6 +43,30 @@ function post_boat(name, type, length) {
     return key;
   });
 }
+
+// promisey get boat
+function get_boat(id) {
+  const key = datastore.key([boat, parseInt(id, 10)]);
+  return datastore
+    .get(key)
+    .then((entity) => {
+      return entity;
+    })
+    .catch((error) => {
+      console.log('caught' + error);
+      return null;
+    });
+}
+
+// function get_boat(id) {
+//   const key = datastore.key([boat, parseInt(id, 10)]);
+//   const boatObj = datastore.get(key);
+//   if (boatObj === null) {
+//     return null;
+//   } else {
+//     return boat;
+//   }
+// }
 
 function get_boats() {
   const q = datastore.createQuery(boat);
@@ -51,6 +89,25 @@ function delete_boat(id) {
 /* ------------- End Model Functions ------------- */
 
 /* ------------- Begin Controller Functions ------------- */
+
+// promisey get boat id
+router.get('/:id', function (req, res) {
+  get_boat(req.params.id)
+    .then((boat) => {
+      const self = 'http://' + req.headers['host'] + '/boats/' + req.params.id;
+      res.status(200).json({
+        self: self,
+        name: boat[0]['name'],
+        type: boat[0]['type'],
+        length: boat[0]['length'],
+        id: req.params.id,
+      });
+    })
+    .catch((error) => {
+      console.log('Caught in error, heres the error' + error);
+      res.status(404).json({Error: 'No boat with this boat_id exists'});
+    });
+});
 
 router.get('/', function (req, res) {
   const boats = get_boats().then((boats) => {
@@ -82,6 +139,16 @@ router.post('/', function (req, res) {
 });
 
 router.put('/:id', function (req, res) {
+  const bd = req.body.name;
+  const ty = req.body.type;
+  const le = req.body.length;
+  if (bd === undefined || ty === undefined || le === undefined) {
+    res.status(400).json({
+      Error:
+        'The request object is missing at least one of the required attributes',
+    });
+    return;
+  }
   put_boat(req.params.id, req.body.name, req.body.type, req.body.length).then(
     res.status(200).end()
   );
