@@ -116,14 +116,7 @@ router.get('/', function (req, res) {
 });
 
 router.post('/', function (req, res) {
-  const bd = req.body.name;
-  const ty = req.body.type;
-  const le = req.body.length;
-  if (bd === undefined || ty === undefined || le === undefined) {
-    res.status(400).json({
-      Error:
-        'The request object is missing at least one of the required attributes',
-    });
+  if (allAttr(req, res)) {
     return;
   }
   post_boat(req.body.name, req.body.type, req.body.length).then((key) => {
@@ -138,20 +131,37 @@ router.post('/', function (req, res) {
   });
 });
 
-router.put('/:id', function (req, res) {
-  const bd = req.body.name;
-  const ty = req.body.type;
-  const le = req.body.length;
-  if (bd === undefined || ty === undefined || le === undefined) {
-    res.status(400).json({
-      Error:
-        'The request object is missing at least one of the required attributes',
-    });
+router.patch('/:id', function (req, res) {
+  // for patch, need to combine promise logic I mage for get, along with the post logic I made so that I can
+  // check if something's there, if it is, then I run the put boat thing, and I put all the wonderful little things
+  // that it wants me to json back to them.
+  if (allAttr(req, res)) {
     return;
   }
-  put_boat(req.params.id, req.body.name, req.body.type, req.body.length).then(
-    res.status(200).end()
-  );
+  get_boat(req.params.id)
+    .then(() => {
+      put_boat(
+        req.params.id,
+        req.body.name,
+        req.body.type,
+        req.body.length
+      ).then(() => {
+        const self =
+          'http://' + req.headers['host'] + '/boats/' + req.params.id;
+        res.status(201).json({
+          name: req.body.name,
+          type: req.body.type,
+          length: req.body.length,
+          id: req.params.id,
+          self: self,
+        });
+      });
+    })
+    .catch((error) => {
+      console.log('Caught in error, heres the error' + error);
+      //{"Error":"Caught in error, heres the errorReferenceError: Cannot access 'boat' before initialization"}
+      res.status(404).json({Error: 'Caught in error, heres the error' + error});
+    });
 });
 
 router.delete('/:id', function (req, res) {
