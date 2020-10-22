@@ -44,6 +44,12 @@ function post_boat(name, type, length) {
   });
 }
 
+function put_boat(id, name, description, price) {
+  const key = datastore.key(['boats', parseInt(id, 10)]);
+  const boat = {name: name, type: description, length: price};
+  return datastore.save({key: key, data: boat});
+}
+
 // promisey get boat
 function get_boat(id) {
   const key = datastore.key([boat, parseInt(id, 10)]);
@@ -73,12 +79,6 @@ function get_boats() {
   return datastore.runQuery(q).then((entities) => {
     return entities[0].map(fromDatastore);
   });
-}
-
-function put_boat(id, name, description, price) {
-  const key = datastore.key([boat, parseInt(id, 10)]);
-  const boat = {name: name, type: description, length: price};
-  return datastore.save({key: key, data: boat});
 }
 
 function delete_boat(id) {
@@ -138,25 +138,22 @@ router.patch('/:id', function (req, res) {
   if (allAttr(req, res)) {
     return;
   }
+
   get_boat(req.params.id)
+    .then((boat) => {
+      put_boat(req.params.id, req.body.name, req.body.type, req.body.length);
+    })
     .then(() => {
-      put_boat(
-        req.params.id,
-        req.body.name,
-        req.body.type,
-        req.body.length
-      ).then(() => {
-        const self =
-          'http://' + req.headers['host'] + '/boats/' + req.params.id;
-        res.status(201).json({
-          name: req.body.name,
-          type: req.body.type,
-          length: req.body.length,
-          id: req.params.id,
-          self: self,
-        });
+      const self = 'http://' + req.headers['host'] + '/boats/' + req.params.id;
+      res.status(200).json({
+        name: req.body.name,
+        type: req.body.type,
+        length: req.body.length,
+        id: req.params.id,
+        self: self,
       });
     })
+
     .catch((error) => {
       console.log('Caught in error, heres the error' + error);
       //{"Error":"Caught in error, heres the errorReferenceError: Cannot access 'boat' before initialization"}
